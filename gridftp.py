@@ -170,7 +170,7 @@ def main():
     destination_ftp = ""
 
     #for download
-    pid         = "21.T12995/B6C1FB3C-ABE3-11E6-9CC0-040091643BEA"
+    pid         = "21.T12995/A866A7A8-E947-11E6-A26B-040091643BEA"
     destination = ""
 
     for o, a in opts:
