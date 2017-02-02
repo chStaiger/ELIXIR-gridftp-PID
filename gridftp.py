@@ -63,18 +63,29 @@ def register_dataset(ec, cred, dataset, protocol, server):
         Handle = ec.search_handle(**rev_args)[0]
 
     return Handle
- 
+
+# Returns a list of children or empty list
+def get_children(pid, ec):
+    entry = ec.get_value_from_handle(pid, 'CHILDREN')
+    if entry == None:
+        return []
+    else:
+        return entry.replace("u'", "").replace("'", "").strip("]").strip("[").split(', ')    
+
 def register_files(ec, cred, dataset, protocol, server):
     #Create PID for each file and subcollection in the dataset
-    # List dataset
     args       = dict([('TYPE', 'Folder'), ('PROTOCOL', protocol),
                     ('SITE', server)])
-    collection = [dataset]
+    parent_args = dict()
+    collection = [dataset] # root collection
     while len(collection) > 0:
+        children = []
         coll = collection[0]
+        rev_args = dict([('URL', coll)])
+        coll_pid = ec.search_handle(**rev_args)[0]
         p = subprocess.Popen(["globus-url-copy -list "+ protocol+"://"+server+coll], 
             shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        for line in p.stdout.readlines()[1:]:
+        for line in p.stdout.readlines()[1:]: #get files and folders
             if line.strip() == "":
                 continue
             else:
@@ -85,19 +96,29 @@ def register_files(ec, cred, dataset, protocol, server):
                     #print collection
                 else:
                     args["TYPE"]    = "File"
-                #reverse lookup, do not regenerate PIDs
+                args["PARENT"]  = coll_pid
+                #reverse lookup for field URL, do not regenerate PIDs for same paths
                 rev_args = dict([('URL', coll+line.strip())])
                 if ec.search_handle(**rev_args)==[]:
                     uid = uuid.uuid1()
                     h   = ec.register_handle(cred.get_prefix() + '/' + str(uid), 
                         coll+line.strip())
+                    children.append(h)
                     exit_code       = ec.modify_handle_value(h, ttl=None, 
                             add_if_not_exist=True, **args)
                     print GREEN, "DEBUG", DEFAULT, "Created handle", h, \
                         "for", coll+line.strip()
                 else:
+                    children.extend(ec.search_handle(**rev_args))
                     print RED, "WARNING", DEFAULT, coll+line.strip(), \
                         "already has handles", ec.search_handle(**rev_args)
+        # Update collection with all PIDs to children
+        parent_args['CHILDREN'] = ', '.join(children)
+        print GREEN, "DEBUG", DEFAULT, "Update ", coll_pid
+        #print GREEN, "DEBUG", DEFAULT, "CHILDREN ", children
+        exit_code = ec.modify_handle_value(coll_pid, ttl=None, 
+            add_if_not_exist=True, **parent_args)
+        print exit_code
         collection.remove(coll)
 
 def download_dataset(pid, destination):
