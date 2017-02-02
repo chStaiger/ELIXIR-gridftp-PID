@@ -43,6 +43,7 @@ def conn_handle(credentials='cred_21.T12995.json'):
 
     return ec, cred
 
+#Create a PID for the root collection
 def register_dataset(ec, cred, dataset, protocol, server):
     #reverse lookup
     rev_args = dict([('URL', dataset)])
@@ -72,17 +73,18 @@ def get_children(pid, ec):
     else:
         return entry.replace("u'", "").replace("'", "").strip("]").strip("[").split(', ')    
 
+#Given the root collection, registers folders and files
+#Data needs to reside on a gridFTP server
 def register_files(ec, cred, dataset, protocol, server):
     #Create PID for each file and subcollection in the dataset
-    args       = dict([('TYPE', 'Folder'), ('PROTOCOL', protocol),
-                    ('SITE', server)])
+    args       = dict([('TYPE', 'Folder'), ('PROTOCOL', protocol), ('SITE', server)])
     parent_args = dict()
     collection = [dataset] # root collection
+
     while len(collection) > 0:
         children = []
         coll = collection[0]
-        rev_args = dict([('URL', coll)])
-        coll_pid = ec.search_handle(**rev_args)[0]
+        coll_pid = ec.search_handle(**dict([('URL', coll)]))[0]
         p = subprocess.Popen(["globus-url-copy -list "+ protocol+"://"+server+coll], 
             shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         for line in p.stdout.readlines()[1:]: #get files and folders
@@ -93,9 +95,9 @@ def register_files(ec, cred, dataset, protocol, server):
                 if line.strip().endswith('/'):
                     args["TYPE"]    = "Folder"
                     collection.append(coll+line.strip())
-                    #print collection
                 else:
                     args["TYPE"]    = "File"
+                
                 args["PARENT"]  = coll_pid
                 #reverse lookup for field URL, do not regenerate PIDs for same paths
                 rev_args = dict([('URL', coll+line.strip())])
@@ -104,8 +106,8 @@ def register_files(ec, cred, dataset, protocol, server):
                     h   = ec.register_handle(cred.get_prefix() + '/' + str(uid), 
                         coll+line.strip())
                     children.append(h)
-                    exit_code       = ec.modify_handle_value(h, ttl=None, 
-                            add_if_not_exist=True, **args)
+                    exit_code = ec.modify_handle_value(h, ttl=None, 
+                        add_if_not_exist=True, **args)
                     print GREEN, "DEBUG", DEFAULT, "Created handle", h, \
                         "for", coll+line.strip()
                 else:
@@ -151,6 +153,13 @@ def download_dataset(pid, destination):
     return exit_code
         
 def main():
+    """
+    Usage:
+    Upload to gridFTP server
+        python gridftp.py -u <upload collection> -g <destination>
+    Download with PID
+        python gridftp.py -d <local download destination> -p <PID>
+    """
     # parse command line options
     try:
         opts, args = getopt.getopt(sys.argv[1:], "hu:d:p:g:e:s", ["help"])
