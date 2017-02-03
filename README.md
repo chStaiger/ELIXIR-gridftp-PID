@@ -15,9 +15,14 @@ The script allows two modes
 ```
 python gridftp.py -u </path/to/source/directory> -g </destination/on/server> -s <gridFTP host fqdn>
 ```
+- Synchronise with an existing dataset: the PID refers to the dataset on the gridFTP server, the local dataset is your working dataset
+```sh
+python gridftp.py -u <upload collection> -p <pid>
+```
 - Download data by collection PID
 ```sh
 python gridftp.py -d </path/to/destination/folder> -p <pid>
 ```
-You can test the download option with `21.T12995/B6C1FB3C-ABE3-11E6-9CC0-040091643BEA`. This PID is resolvable via hdl.handle.net
+Example dataset:
+You can test the download and synchronising option with `21.T12995/A866A7A8-E947-11E6-A26B-040091643BEA`. This PID is resolvable via hdl.handle.net
  *http://hdl.handle.net/21.T12995/51eabd32-ac12-11e6-a655-040091643bea?noredirect*
