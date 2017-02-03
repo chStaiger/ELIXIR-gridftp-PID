@@ -75,7 +75,7 @@ def get_children(pid, ec):
 
 #Given the root collection, registers folders and files
 #Data needs to reside on a gridFTP server
-def register_files(ec, cred, dataset, protocol, server):
+def register_files(ec, dataset, protocol, server):
     #Create PID for each file and subcollection in the dataset
     args       = dict([('TYPE', 'Folder'), ('PROTOCOL', protocol), ('SITE', server)])
     parent_args = dict()
@@ -123,6 +123,35 @@ def register_files(ec, cred, dataset, protocol, server):
         print exit_code
         collection.remove(coll)
 
+def sync_dataset(pid, local_data, ec):
+# Synchronises a local dataset to an existing registered dataset on a grdiFTP server.
+    # Get location of dataset
+    assert ec.get_value_from_handle(pid, 'TYPE') == 'Folder'
+
+    server      = ec.get_value_from_handle(pid, 'SITE').strip('/')
+    protocol    = ec.get_value_from_handle(pid, 'PROTOCOL')
+    dest_coll   = ec.get_value_from_handle(pid, 'URL')
+
+    # By default only files that are not present will be transfered
+    # -sync -sync-level 0
+
+    exit_code = subprocess.call(["grid-proxy-init"])
+    if exit_code == 0:
+        print GREEN, "DEBUG", DEFAULT, \
+            "Uplopading", local_data, "to", protocol+"://"+server+dest_coll
+        exit_code = subprocess.call(["globus-url-copy", "-cd", "-r",
+            "-sync", "-sync-level", "0", local_data, protocol+"://"+server+dest_coll])
+        print GREEN, "DEBUG"
+        exit_code = subprocess.call(["globus-url-copy", "-list",
+            protocol+"://"+server+dest_coll])
+        print DEFAULT
+
+    # Update PID entries for a whole dataset, e.g. after adding more data
+    # Add children and link to parent
+    # Assumes that data cannot be deleted from dataset.
+
+    register_files(ec, dest_coll, protocol, server)
+
 def download_dataset(pid, destination):
     #Instantiate client for reading --> credentials necessary
     ec      = EUDATHandleClient.instantiate_for_read_access('https://hdl.handle.net')    
@@ -157,6 +186,8 @@ def main():
     Usage:
     Upload to gridFTP server
         python gridftp.py -u <upload collection> -g <destination>
+    Syncchronise existing dataset
+        python gridftp.py -u <upload collection> -p <PID>
     Download with PID
         python gridftp.py -d <local download destination> -p <PID>
     """
@@ -188,6 +219,8 @@ def main():
             print "Help"
             print __doc__
             sys.exit(0)
+        elif o == "--sync":
+            sync = True
         elif o == "-u":
             dataset_up = a
         elif o == "-d":
@@ -216,6 +249,9 @@ def main():
         pid = register_dataset(ec, cred, destination_ftp, protocol, server)
         print "Dataset PID:", pid
         register_files(ec, cred, destination_ftp, protocol, server)
+    elif dataset_up and pid:
+        ec, cred = conn_handle(credentials='cred_21.T12995.json')
+        sync_dataset(pid, dataset_up, ec)
     elif pid and destination:
         print "Downloading data fom gridFTP server"
         download_dataset(pid, destination)
