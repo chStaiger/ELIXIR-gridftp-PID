@@ -75,7 +75,7 @@ def get_children(pid, ec):
 
 #Given the root collection, registers folders and files
 #Data needs to reside on a gridFTP server
-def register_files(ec, dataset, protocol, server):
+def register_files(ec, cred, dataset, protocol, server):
     #Create PID for each file and subcollection in the dataset
     args       = dict([('TYPE', 'Folder'), ('PROTOCOL', protocol), ('SITE', server)])
     parent_args = dict()
@@ -122,7 +122,7 @@ def register_files(ec, dataset, protocol, server):
             add_if_not_exist=True, **parent_args)
         collection.remove(coll)
 
-def sync_dataset(pid, local_data, ec):
+def sync_dataset(pid, local_data, ec, cred):
 # Synchronises a local dataset to an existing registered dataset on a grdiFTP server.
     # Get location of dataset
     assert ec.get_value_from_handle(pid, 'TYPE') == 'Folder'
@@ -150,7 +150,7 @@ def sync_dataset(pid, local_data, ec):
     # Add children and link to parent
     # Assumes that data cannot be deleted from dataset.
 
-    register_files(ec, dest_coll, protocol, server)
+    register_files(ec, cred, dest_coll, protocol, server)
 
 def download_dataset(pid, destination):
     #Instantiate client for reading --> credentials necessary
@@ -290,7 +290,7 @@ def main():
         register_files(ec, cred, destination_ftp, protocol, server)
     elif dataset_up and pid:
         ec, cred = conn_handle(credentials='cred_21.T12995.json')
-        sync_dataset(pid, dataset_up, ec)
+        sync_dataset(pid, dataset_up, ec, cred)
     elif pid and destination:
         print "Downloading data fom gridFTP server"
         download_dataset(pid, destination)
