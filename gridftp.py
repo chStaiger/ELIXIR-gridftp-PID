@@ -56,7 +56,7 @@ def register_dataset(ec, cred, dataset, protocol, server):
         #Add information types
         args        = dict([('TYPE', 'Folder'), ('PROTOCOL', protocol), 
                     ('SITE', server)])
-        exit_code   = ec.modify_handle_value(Handle, ttl=None, 
+        ec.modify_handle_value(Handle, ttl=None, 
                     add_if_not_exist=True, **args)
     else:
         print RED, "WARNING", DEFAULT, dataset, \
@@ -106,7 +106,7 @@ def register_files(ec, dataset, protocol, server):
                     h   = ec.register_handle(cred.get_prefix() + '/' + str(uid), 
                         coll+line.strip())
                     children.append(h)
-                    exit_code = ec.modify_handle_value(h, ttl=None, 
+                    ec.modify_handle_value(h, ttl=None, 
                         add_if_not_exist=True, **args)
                     print GREEN, "DEBUG", DEFAULT, "Created handle", h, \
                         "for", coll+line.strip()
@@ -118,9 +118,8 @@ def register_files(ec, dataset, protocol, server):
         parent_args['CHILDREN'] = ', '.join(children)
         print GREEN, "DEBUG", DEFAULT, "Update ", coll_pid
         #print GREEN, "DEBUG", DEFAULT, "CHILDREN ", children
-        exit_code = ec.modify_handle_value(coll_pid, ttl=None, 
+        ec.modify_handle_value(coll_pid, ttl=None, 
             add_if_not_exist=True, **parent_args)
-        print exit_code
         collection.remove(coll)
 
 def sync_dataset(pid, local_data, ec):
@@ -141,9 +140,10 @@ def sync_dataset(pid, local_data, ec):
             "Uplopading", local_data, "to", protocol+"://"+server+dest_coll
         exit_code = subprocess.call(["globus-url-copy", "-cd", "-r",
             "-sync", "-sync-level", "0", local_data, protocol+"://"+server+dest_coll])
-        print GREEN, "DEBUG"
+        print GREEN, "DEBUG", exit_code
         exit_code = subprocess.call(["globus-url-copy", "-list",
             protocol+"://"+server+dest_coll])
+        print GREEN, "DEBUG", exit_code
         print DEFAULT
 
     # Update PID entries for a whole dataset, e.g. after adding more data
@@ -180,20 +180,54 @@ def download_dataset(pid, destination):
         protocol+"://"+site+source, destination])
 
     return exit_code
-        
+
+def update_url(pid, new_location, ec):
+    # After moving a dataset to another location all the URL fields need to be updated.
+    # new_location needs a trailing '/'!!
+
+    # Check whether we have the dataset pid:
+    # No PARENT entry
+    record  = ec.retrieve_handle_record(pid)
+    assert 'PARENT' not in record
+
+    url = record['URL'] # root of the dataset
+    # Check if new location is really new
+    assert url  != new_location
+
+    print GREEN, "DEBUG", DEFAULT, "Update URL of collection", pid
+    print GREEN, "DEBUG", DEFAULT, "Old location", url
+    print GREEN, "DEBUG", DEFAULT, "New location", new_location
+    print
+
+    # Update all URL fields in the directory tree
+    collection = [pid] # root collection
+    args = {}
+    while len(collection) > 0:
+        # get all children
+        collection.extend(get_children(collection[0], ec))
+        #print GREEN, "DEBUG", DEFAULT, collection
+        r           = ec.retrieve_handle_record(collection[0])
+        cur_url     = r['URL']
+        args['URL'] = cur_url.replace(url, new_location)
+        ec.modify_handle_value(collection[0], ttl=None, **args)
+        collection.remove(collection[0])
+    print GREEN, "DEBUG", DEFAULT, "URL Update DONE."
+     
 def main():
     """
     Usage:
     Upload to gridFTP server
         python gridftp.py -u <upload collection> -g <destination>
-    Syncchronise existing dataset
+    Synchronise existing dataset
         python gridftp.py -u <upload collection> -p <PID>
-    Download with PID
-        python gridftp.py -d <local download destination> -p <PID>
+    Update URL of a dataset
+        python gridftp.py -p <PID> -n <new URL to dataset>
+    Download with PID 
+        pythoe gridftp.py -d <local download destination> -p <PID>
     """
     # parse command line options
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hu:d:p:g:e:s", ["help"])
+        opts, args = getopt.getopt(sys.argv[1:], "hu:d:p:g:e:n:s", ["help"])
     except getopt.error, msg:
         print msg
         print "for help use --help"
@@ -212,6 +246,9 @@ def main():
     #for download
     pid         = "21.T12995/A866A7A8-E947-11E6-A26B-040091643BEA"
     destination = ""
+
+    #for update
+    new_loc     = ""
 
     for o, a in opts:
         print o, a
@@ -233,6 +270,8 @@ def main():
             protocol = a
         elif o == "-s":
             server = a
+        elif o == "-n":
+            new_loc = a
         else:
             print "option unknown"
             sys.exit(2)
@@ -255,6 +294,9 @@ def main():
     elif pid and destination:
         print "Downloading data fom gridFTP server"
         download_dataset(pid, destination)
+    elif pid and new_loc:
+        ec, cred = conn_handle(credentials='cred_21.T12995.json')
+        update_url(pid, new_loc, ec) 
     else: 
         print "%sNot a valid option. For help use --help%s"  %(RED, DEFAULT)
         return 0
