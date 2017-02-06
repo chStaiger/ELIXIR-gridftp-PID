@@ -19,6 +19,10 @@ python gridftp.py -u </path/to/source/directory> -g </destination/on/server> -s 
 ```sh
 python gridftp.py -u <upload collection> -p <pid>
 ```
+- Update the URL of a dataset recursively
+```sh
+python gridftp.py -p <PID> -n <new URL to dataset>
+```
 - Download data by collection PID
 ```sh
 python gridftp.py -d </path/to/destination/folder> -p <pid>
