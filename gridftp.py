@@ -157,6 +157,8 @@ def download_dataset(pid, destination):
     ec      = EUDATHandleClient.instantiate_for_read_access('https://hdl.handle.net')    
     record  = ec.retrieve_handle_record(pid)
 
+    assert record != None
+
     assert 'URL'        in record
     assert 'PROTOCOL'   in record
     assert 'SITE'       in record
@@ -188,6 +190,7 @@ def update_url(pid, new_location, ec):
     # Check whether we have the dataset pid:
     # No PARENT entry
     record  = ec.retrieve_handle_record(pid)
+    assert record != None
     assert 'PARENT' not in record
 
     url = record['URL'] # root of the dataset
