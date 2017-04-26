@@ -230,7 +230,7 @@ def main():
     """
     # parse command line options
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hu:d:p:g:e:n:s", ["help"])
+        opts, args = getopt.getopt(sys.argv[1:], "hu:d:p:g:e:n:s:", ["help"])
     except getopt.error, msg:
         print msg
         print "for help use --help"
